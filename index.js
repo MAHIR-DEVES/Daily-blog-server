@@ -135,6 +135,32 @@ app.put('/api/blogs/:id', (req, res) => {
   });
 });
 
+app.post('/login', (req, res) => {
+  const { name, email, password, phone } = req.body;
+
+  console.log(name, email, password, phone);
+
+  // check all fields
+  if (!name || !email || !password || !phone) {
+    return res.status(400).json({ message: 'All fields are required.' });
+  }
+
+  const sql =
+    'INSERT INTO users (name, email, password, phone) VALUES (?, ?, ?, ?)';
+  const values = [name, email, password, phone];
+
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error('Failed to insert user:', err);
+      return res.status(500).json({ message: 'Database insert error.' });
+    }
+
+    res
+      .status(200)
+      .json({ message: 'User saved successfully!', userId: result.insertId });
+  });
+});
+
 // Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
