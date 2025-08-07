@@ -1,11 +1,15 @@
 // server.js
 require('dotenv').config();
+const jwt = require('jsonwebtoken');
+const secretKey = process.env.secret_key;
 
 const express = require('express');
 const mysql = require('mysql');
 const cors = require('cors');
+const bcrypt = require('bcrypt');
 
 const app = express();
+const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
@@ -135,7 +139,9 @@ app.put('/api/blogs/:id', (req, res) => {
   });
 });
 
-app.post('/login', (req, res) => {
+// register
+
+app.post('/register', async (req, res) => {
   const { name, email, password, phone } = req.body;
 
   console.log(name, email, password, phone);
@@ -145,9 +151,12 @@ app.post('/login', (req, res) => {
     return res.status(400).json({ message: 'All fields are required.' });
   }
 
+  const saltRounds = 10;
+  const hashedPassword = await bcrypt.hash(password, saltRounds);
+
   const sql =
     'INSERT INTO users (name, email, password, phone) VALUES (?, ?, ?, ?)';
-  const values = [name, email, password, phone];
+  const values = [name, email, hashedPassword, phone];
 
   db.query(sql, values, (err, result) => {
     if (err) {
@@ -161,8 +170,41 @@ app.post('/login', (req, res) => {
   });
 });
 
+// login ck
+app.post('/login-check', (req, res) => {
+  const { email, password } = req.body;
+
+  console.log(email, password);
+
+  const sql = 'SELECT * FROM users WHERE email = ?';
+  db.query(sql, [email], async (err, results) => {
+    if (err) return res.status(500).json({ message: 'DB error.' });
+
+    if (results.length === 0) {
+      return res.status(400).json({ message: 'User not found.' });
+    }
+
+    const user = results[0];
+
+    const match = await bcrypt.compare(password, user.password);
+
+    if (match) {
+      const token = jwt.sign({ id: user.id, email: user.email }, secretKey, {
+        expiresIn: '1h',
+      });
+
+      res.status(200).json({ message: 'Login successful!', token });
+    } else {
+      res.status(401).json({ message: 'Invalid credentials.' });
+    }
+  });
+});
+
+app.get('/', (req, res) => {
+  res.send('Hello from Daily Blog server!');
+});
+
 // Server
-const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(` Server is running on port ${PORT}`);
+  console.log(`Server is running on ${PORT}`);
 });
